@@ -115,3 +115,4 @@ if __name__=="__main__":
     env.process(destination_node(env, pipe))
     print 'start simulation'
     env.run(until=SIM_DURATION)
+
