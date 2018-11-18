@@ -5,27 +5,27 @@ import itertools
 import simpy
 
 
-# values may need to change for unit conversions (converting to ms might be best)
-SEEDS = [seed for seed in range(13, 43)]  # change as desired (multiple runs)
+# values may need to change for unit conversions
+SEEDS = [seed for seed in range(13, 14)]  # change as desired (multiple runs)
 TRAFFIC_GENERATION_RATE = 20  # number of packets per second from source node
 TRANSMITION_SPEED_SOURCE = 10  # in Mbps
 PACKET_DATA_LENGTH = 1000  # in Bytes (1 Byte = 8 bits)
 ROUTER_DEST_DELAY = 50  # in ms
 HIGH_PRIORITY_QUEUE = Queue()  # need to set size
 LOW_PRIORITY_QUEUE = Queue()  # need to set size
-SIM_DURATION = 100  # for testing
+SIM_DURATION = 100  # length of simulation in ticks
+
+# for normal distribution
 X = 1  # change as needed
 Y = 1  # change as needed
 
 
 class Packet(object):
-    """class for containing event information
-    """
+    """class for containing event information"""
     def __init__(self, env, seq_num):
         self.start_time = env.now
         self.seq_num = seq_num
-        self.delay = 0.02  # need to change to normal dist random delay
-        # also need to figure out how to enforce delay
+        self.delay = 0.02  # need to change to normal dist random delay using X and Y
 
 
 class Pipes(object):
@@ -44,7 +44,9 @@ class Pipes(object):
             self.current_seq = packet.seq_num
 
     def router_latency(self, p):
-        '''simulates the random normal dist latency unique to each packet'''
+        '''simulates the random normal dist latency unique to each packet
+        
+        need to add TRANSMITION_SPEED_SOURCE and PACKET_DATA_LENGTH calculation to p.delay'''
         yield self.env.timeout(p.delay / 1000.0)
         self.router_send(p)
 
@@ -66,6 +68,15 @@ class Pipes(object):
         return self.to_dest.get()
 
 
+def source_node(env, pipe):
+    '''generates packets
+
+    need to add poisson rate of arrival'''
+    for i in itertools.count():
+        yield env.timeout(1.0 / TRAFFIC_GENERATION_RATE)  # poisson
+        p = Packet(env, i)
+        pipe.put_router(p)
+
 def router(env, pipe):
     '''checks both queues and sends packets from queues to dest node
     
@@ -85,16 +96,6 @@ def router(env, pipe):
             pipe.put_dest(packet)
         yield env.timeout(0.0001)
 
-def source_node(env, pipe):
-    '''generates packets
-
-    need to add poisson rate of arrival'''
-    for i in itertools.count():
-        yield env.timeout(1.0 / TRAFFIC_GENERATION_RATE)  # poisson
-        p = Packet(env, i)
-        pipe.put_router(p)
-
-
 def destination_node(env, pipe):
     '''process that consumes values from router'''
     while True:
@@ -102,17 +103,26 @@ def destination_node(env, pipe):
         
         print "packet {} arrived at dest".format(packet.seq_num)
 
+
 if __name__=="__main__":
-    random.seed(SEEDS[0])  # just take the first until we need multiple runs
-    print 'creating env and pipes'
-    env = simpy.Environment()
-    pipe = Pipes(env)
-    print 'init source node process'
-    env.process(source_node(env, pipe))
-    print 'init router process'
-    env.process(router(env, pipe))
-    print 'init dest node process'
-    env.process(destination_node(env, pipe))
-    print 'start simulation'
-    env.run(until=SIM_DURATION)
+
+    for s in SEEDS:
+
+        random.seed(s)
+
+        print 'creating env and pipes'
+        env = simpy.Environment()
+        pipe = Pipes(env)
+
+        print 'init source node process'
+        env.process(source_node(env, pipe))
+
+        print 'init router process'
+        env.process(router(env, pipe))
+
+        print 'init dest node process'
+        env.process(destination_node(env, pipe))
+
+        print 'start simulation'
+        env.run(until=SIM_DURATION)
 
