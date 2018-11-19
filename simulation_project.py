@@ -9,10 +9,11 @@ import simpy
 SEEDS = [seed for seed in range(13, 14)]  # change as desired (multiple runs)
 TRAFFIC_GENERATION_RATE = 20  # number of packets per second from source node
 TRANSMITION_SPEED_SOURCE = 10  # in Mbps
+TRANSMITION_SPEED_ROUTER = 15  # in Mbps
 PACKET_DATA_LENGTH = 1000  # in Bytes (1 Byte = 8 bits)
 ROUTER_DEST_DELAY = 50  # in ms
-HIGH_PRIORITY_QUEUE = Queue()  # need to set size
-LOW_PRIORITY_QUEUE = Queue()  # need to set size
+HIGH_PRIORITY_QUEUE = Queue(10000)  # 10 MB / 1000 Byte packets
+LOW_PRIORITY_QUEUE = Queue(10000)  # 10 MB / 1000 Byte packets
 SIM_DURATION = 100  # length of simulation in ticks
 
 # for normal distribution
