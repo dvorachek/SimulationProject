@@ -1,3 +1,4 @@
+#!/usr/bin/python
 import random
 from Queue import Queue
 import itertools
@@ -20,6 +21,13 @@ SIM_DURATION = 100  # length of simulation in ticks
 X = 1  # change as needed
 Y = 1  # change as needed
 
+def normal(mean, var):
+	
+	pass
+
+def poisson(param):
+	
+	pass
 
 class Packet(object):
     """class for containing event information"""
