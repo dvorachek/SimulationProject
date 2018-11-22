@@ -21,20 +21,13 @@ SIM_DURATION = 100  # length of simulation in ticks
 X = 1  # change as needed
 Y = 1  # change as needed
 
-def normal(mean, var):
-	
-	pass
-
-def poisson(param):
-	
-	pass
 
 class Packet(object):
     """class for containing event information"""
     def __init__(self, env, seq_num):
         self.start_time = env.now
         self.seq_num = seq_num
-        self.delay = 0.02  # need to change to normal dist random delay using X and Y
+        self.delay = normal()  # we assume the delay is in seconds
 
 
 class Pipes(object):
@@ -56,7 +49,7 @@ class Pipes(object):
         '''simulates the random normal dist latency unique to each packet
         
         need to add TRANSMITION_SPEED_SOURCE and PACKET_DATA_LENGTH calculation to p.delay'''
-        yield self.env.timeout(p.delay / 1000.0)
+        yield self.env.timeout(p.delay + (1250**-1))
         self.router_send(p)
 
     def put_router(self, p):
@@ -65,7 +58,7 @@ class Pipes(object):
 
     def fixed_latency(self, p):
         '''simulates the fixed latency from router to dest node'''
-        yield self.env.timeout(ROUTER_DEST_DELAY / 1000.0)
+        yield self.env.timeout((ROUTER_DEST_DELAY / 1000.0) + (1875**-1))
         self.to_dest.put(p)
 
     def put_dest(self, p):
@@ -82,7 +75,7 @@ def source_node(env, pipe):
 
     need to add poisson rate of arrival'''
     for i in itertools.count():
-        yield env.timeout(1.0 / TRAFFIC_GENERATION_RATE)  # poisson
+        yield env.timeout(1.0 / TRAFFIC_GENERATION_RATE)  # poisson process
         p = Packet(env, i)
         pipe.put_router(p)
 
@@ -111,6 +104,12 @@ def destination_node(env, pipe):
         packet = yield pipe.get()
         
         print "packet {} arrived at dest".format(packet.seq_num)
+
+def normal():
+    delay = -1
+    while delay < 0:
+        delay = random.normalvariate(X, Y)
+    return delay
 
 
 if __name__=="__main__":
