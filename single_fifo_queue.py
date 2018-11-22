@@ -5,6 +5,10 @@ import itertools
 
 import simpy
 
+'''
+THIS VERSION IS THE SINGLE FIFO QUEUE, SINGLE SERVER VARIATION
+'''
+
 
 # values may need to change for unit conversions
 SEEDS = [seed for seed in range(13, 14)]  # change as desired (multiple runs)
@@ -13,8 +17,7 @@ TRANSMITION_SPEED_SOURCE = 10  # in Mbps
 TRANSMITION_SPEED_ROUTER = 15  # in Mbps
 PACKET_DATA_LENGTH = 1000  # in Bytes (1 Byte = 8 bits)
 ROUTER_DEST_DELAY = 50  # in ms
-HIGH_PRIORITY_QUEUE = Queue(10000)  # 10 MB / 1000 Byte packets
-LOW_PRIORITY_QUEUE = Queue(10000)  # 10 MB / 1000 Byte packets
+SINGLE_QUEUE = Queue(10000)  # 10 MB / 1000 Byte packets
 SIM_DURATION = 100  # length of simulation in ticks
 
 # for normal distribution
@@ -38,12 +41,8 @@ class Pipes(object):
         self.current_seq = -1
 
     def router_send(self, packet):
-        '''sorts the packets into high/low priority queues'''
-        if packet.seq_num < self.current_seq:
-            HIGH_PRIORITY_QUEUE.put(packet)
-        else:
-            LOW_PRIORITY_QUEUE.put(packet)
-            self.current_seq = packet.seq_num
+        '''sorts the packets into single fifo queues'''
+        SINGLE_QUEUE.put(packet)
 
     def router_latency(self, p):
         '''simulates the random normal dist latency unique to each packet'''
@@ -78,21 +77,13 @@ def source_node(env, pipe):
         pipe.put_router(p)
 
 def router(env, pipe):
-    '''checks both queues and sends packets from queues to dest node
+    '''checks queue and sends packets from queue to dest node
     
     print statements are for testing'''
 
     while True:
-        if not HIGH_PRIORITY_QUEUE.empty():
-            packet = HIGH_PRIORITY_QUEUE.get()
-            '''print 'high priority'
-            print "do something with {}".format(packet.seq_num)'''
-            pipe.put_dest(packet)
-        if HIGH_PRIORITY_QUEUE.empty() and not LOW_PRIORITY_QUEUE.empty():
-            packet = LOW_PRIORITY_QUEUE.get()
-            '''print 'low priority'
-            print "do something with {}".format(packet.seq_num)
-            print "{0:.3f}".format(env.now)'''
+        if not SINGLE_QUEUE.empty():
+            packet = SINGLE_QUEUE.get()
             pipe.put_dest(packet)
         yield env.timeout(0.0001)
 
