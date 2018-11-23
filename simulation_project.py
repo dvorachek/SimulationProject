@@ -10,7 +10,7 @@ SINGLE_QUEUE_VARIANT = False  # change to true to use a single queue
 FIFO_QUEUE = Queue(10000)  # 10MB / 1000 Byte packets
 
 # values may need to change for unit conversions
-SEEDS = [seed for seed in range(13, 14)]  # change as desired (multiple runs)
+SEEDS = [seed for seed in range(13, 43)]  # change as desired (multiple runs)
 TRAFFIC_GENERATION_RATE = 20  # number of packets per second from source node
 TRANSMITION_SPEED_SOURCE = 10  # in Mbps
 TRANSMITION_SPEED_ROUTER = 15  # in Mbps
@@ -24,14 +24,14 @@ SIM_DURATION = 100  # length of simulation in ticks
 X = 1  # change as needed
 Y = 1  # change as needed
 
-# data struct for stats collection
-total_num_packets = 0
-total_packet_time = 0
-total_out_of_order_packets = 0
-total_packets_dropped = 0
-# will need to reset for each run
-# these results will need to be summed in anot
+# const index for data collection
+TOTAL_NUM_PACKETS = 0
+TOTAL_PACKET_TIME = 1
+TOTAL_OUT_ORDER_PACKETS = 2
+TOTAL_PACKETS_DROPPED = 3
 
+run_data = [0 for _ in range(4)]  # holds data for each run
+total_data = []  # data summary
 
 
 class Packet(object):
@@ -53,14 +53,25 @@ class Pipes(object):
         '''sorts the packets into high/low priority queues
         or single queue if that mode it toggled'''
         if SINGLE_QUEUE_VARIANT:
-            FIFO_QUEUE.put(packet)
+            if FIFO_QUEUE.full():
+                run_data[TOTAL_PACKETS_DROPPED] += 1
+            else:
+                FIFO_QUEUE.put(packet)
 
         else:
             if packet.seq_num < self.current_seq:
-                HIGH_PRIORITY_QUEUE.put(packet)
+                run_data[TOTAL_OUT_ORDER_PACKETS] += 1
+                if HIGH_PRIORITY_QUEUE.full():
+                    run_data[TOTAL_PACKETS_DROPPED] += 1
+                else:
+                    HIGH_PRIORITY_QUEUE.put(packet)
+
             else:
-                LOW_PRIORITY_QUEUE.put(packet)
-                self.current_seq = packet.seq_num
+                if LOW_PRIORITY_QUEUE.full():
+                    run_data[TOTAL_PACKETS_DROPPED] += 1
+                else:
+                    LOW_PRIORITY_QUEUE.put(packet)
+                    self.current_seq = packet.seq_num
 
     def router_latency(self, p):
         '''simulates the random normal dist latency unique to each packet'''
@@ -73,7 +84,7 @@ class Pipes(object):
 
     def fixed_latency(self, p):
         '''simulates the fixed latency from router to dest node'''
-        yield self.env.timeout((ROUTER_DEST_DELAY / 1000.0) + (1875**-1))
+        yield self.env.timeout((ROUTER_DEST_DELAY / 1000.0) + (1875**-1))  # change to 1250**-1
         self.to_dest.put(p)
 
     def put_dest(self, p):
@@ -92,7 +103,7 @@ def source_node(env, pipe):
     for i in itertools.count():
         yield env.timeout(1.0 / TRAFFIC_GENERATION_RATE)  # poisson process
         p = Packet(env, i)
-
+        run_data[TOTAL_NUM_PACKETS] += 1
         pipe.put_router(p)
 
 def router(env, pipe):
@@ -124,8 +135,8 @@ def destination_node(env, pipe):
     '''process that consumes values from router'''
     while True:
         packet = yield pipe.get()
-        
-        print "packet {} arrived at dest".format(packet.seq_num)
+        run_data[TOTAL_PACKET_TIME] += (env.now - packet.start_time)
+        # print "packet {} arrived at dest".format(packet.seq_num)
 
 def normal():
     delay = -1
@@ -155,4 +166,12 @@ if __name__=="__main__":
 
         print 'start simulation'
         env.run(until=SIM_DURATION)
+
+        print run_data
+        total_data.append(run_data)
+
+        # reset run_data for next seed
+        run_data = [0 for _ in range(4)]
+
+    print total_data
 
