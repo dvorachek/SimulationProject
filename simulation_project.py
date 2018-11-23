@@ -5,6 +5,9 @@ import itertools
 
 import simpy
 
+# for single queue single server variant
+SINGLE_QUEUE_VARIANT = False  # change to true to use a single queue
+FIFO_QUEUE = Queue(10000)  # 10MB / 1000 Byte packets
 
 # values may need to change for unit conversions
 SEEDS = [seed for seed in range(13, 14)]  # change as desired (multiple runs)
@@ -20,6 +23,15 @@ SIM_DURATION = 100  # length of simulation in ticks
 # for normal distribution
 X = 1  # change as needed
 Y = 1  # change as needed
+
+# data struct for stats collection
+total_num_packets = 0
+total_packet_time = 0
+total_out_of_order_packets = 0
+total_packets_dropped = 0
+# will need to reset for each run
+# these results will need to be summed in anot
+
 
 
 class Packet(object):
@@ -38,12 +50,17 @@ class Pipes(object):
         self.current_seq = -1
 
     def router_send(self, packet):
-        '''sorts the packets into high/low priority queues'''
-        if packet.seq_num < self.current_seq:
-            HIGH_PRIORITY_QUEUE.put(packet)
+        '''sorts the packets into high/low priority queues
+        or single queue if that mode it toggled'''
+        if SINGLE_QUEUE_VARIANT:
+            FIFO_QUEUE.put(packet)
+
         else:
-            LOW_PRIORITY_QUEUE.put(packet)
-            self.current_seq = packet.seq_num
+            if packet.seq_num < self.current_seq:
+                HIGH_PRIORITY_QUEUE.put(packet)
+            else:
+                LOW_PRIORITY_QUEUE.put(packet)
+                self.current_seq = packet.seq_num
 
     def router_latency(self, p):
         '''simulates the random normal dist latency unique to each packet'''
@@ -75,6 +92,7 @@ def source_node(env, pipe):
     for i in itertools.count():
         yield env.timeout(1.0 / TRAFFIC_GENERATION_RATE)  # poisson process
         p = Packet(env, i)
+
         pipe.put_router(p)
 
 def router(env, pipe):
@@ -83,17 +101,23 @@ def router(env, pipe):
     print statements are for testing'''
 
     while True:
-        if not HIGH_PRIORITY_QUEUE.empty():
-            packet = HIGH_PRIORITY_QUEUE.get()
-            '''print 'high priority'
-            print "do something with {}".format(packet.seq_num)'''
-            pipe.put_dest(packet)
-        if HIGH_PRIORITY_QUEUE.empty() and not LOW_PRIORITY_QUEUE.empty():
-            packet = LOW_PRIORITY_QUEUE.get()
-            '''print 'low priority'
-            print "do something with {}".format(packet.seq_num)
-            print "{0:.3f}".format(env.now)'''
-            pipe.put_dest(packet)
+        if SINGLE_QUEUE_VARIANT:
+            if not FIFO_QUEUE.empty():
+                packet = FIFO_QUEUE.get()
+                pipe.put_dest(packet)
+
+        else:
+            if not HIGH_PRIORITY_QUEUE.empty():
+                packet = HIGH_PRIORITY_QUEUE.get()
+                '''print 'high priority'
+                print "do something with {}".format(packet.seq_num)'''
+                pipe.put_dest(packet)
+            if HIGH_PRIORITY_QUEUE.empty() and not LOW_PRIORITY_QUEUE.empty():
+                packet = LOW_PRIORITY_QUEUE.get()
+                '''print 'low priority'
+                print "do something with {}".format(packet.seq_num)
+                print "{0:.3f}".format(env.now)'''
+                pipe.put_dest(packet)
         yield env.timeout(0.0001)
 
 def destination_node(env, pipe):
