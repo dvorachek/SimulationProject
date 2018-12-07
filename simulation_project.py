@@ -1,6 +1,6 @@
 #!/usr/bin/python
 import random
-from Queue import Queue
+from Queue import Queue, PriorityQueue
 import itertools
 import json
 
@@ -11,14 +11,14 @@ SINGLE_QUEUE_VARIANT = False  # change to true to use a single queue
 FIFO_QUEUE = Queue(10000)  # 10MB / 1000 Byte packets
 
 # values may need to change for unit conversions
-SEEDS = [seed for seed in range(13, 64)]  # change as desired (multiple runs) - currently set for 50 runs
+SEEDS = [seed for seed in range(13, 18)]  # change as desired (multiple runs) - currently set for 5 runs
 TRAFFIC_GENERATION_RATE = 750  # number of packets per second from source node. Test both 750 and 1125; 60% and 90% server utilization
 TRANSMITION_SPEED_SOURCE = 10  # in Mbps
 TRANSMITION_SPEED_ROUTER = 15  # in Mbps
 PACKET_DATA_LENGTH = 1000  # in Bytes (1 Byte = 8 bits)
 ROUTER_DEST_DELAY = 50  # in ms
-HIGH_PRIORITY_QUEUE = Queue(10000)  # 10 MB / 1000 Byte packets
-LOW_PRIORITY_QUEUE = Queue(10000)  # 10 MB / 1000 Byte packets
+HIGH_PRIORITY_QUEUE = PriorityQueue(10000)  # 10 MB / 1000 Byte packets
+LOW_PRIORITY_QUEUE = PriorityQueue(10000)  # 10 MB / 1000 Byte packets
 SIM_DURATION = 100  # length of simulation in ticks
 
 # for normal distribution
@@ -34,12 +34,14 @@ TOTAL_PACKETS_DROPPED = 3
 run_data = [0 for _ in range(4)]  # holds data for each run
 total_data = []  # data summary
 
-file_names = ['single_queue_750.json',
-              'two_queue_750.json',
-              'single_queue_1125.json',
-              'two_queue_1125.json',
-              'single_queue_2150.json',
-              'two_queue_2150.json']
+file_names = ['single_queue_750_X1_Y1.json',
+              'two_queue_750_X1_Y1.json',
+              'single_queue_1125_X1_Y1.json',
+              'two_queue_1125_X1_Y1.json',
+              'single_queue_750_X2_Y2.json',
+              'two_queue_750_X2_Y2.json',
+              'single_queue_1125_X2_Y2.json',
+              'two_queue_1125_X2_Y2.json']
 
 
 class Packet(object):
@@ -76,13 +78,13 @@ class Pipes(object):
                 if HIGH_PRIORITY_QUEUE.full():
                     run_data[TOTAL_PACKETS_DROPPED] += 1
                 else:
-                    HIGH_PRIORITY_QUEUE.put(packet)
+                    HIGH_PRIORITY_QUEUE.put((packet.seq_num, packet))
 
             else:
                 if LOW_PRIORITY_QUEUE.full():
                     run_data[TOTAL_PACKETS_DROPPED] += 1
                 else:
-                    LOW_PRIORITY_QUEUE.put(packet)
+                    LOW_PRIORITY_QUEUE.put((packet.seq_num, packet))
                     self.current_seq = packet.seq_num
 
     def router_latency(self, p):
@@ -132,14 +134,9 @@ def router(env, pipe):
         else:
             if not HIGH_PRIORITY_QUEUE.empty():
                 packet = HIGH_PRIORITY_QUEUE.get()
-                '''print 'high priority'
-                print "do something with {}".format(packet.seq_num)'''
                 pipe.put_dest(packet)
             if HIGH_PRIORITY_QUEUE.empty() and not LOW_PRIORITY_QUEUE.empty():
                 packet = LOW_PRIORITY_QUEUE.get()
-                '''print 'low priority'
-                print "do something with {}".format(packet.seq_num)
-                print "{0:.3f}".format(env.now)'''
                 pipe.put_dest(packet)
         yield env.timeout(0.0001)
 
@@ -147,6 +144,9 @@ def destination_node(env, pipe):
     '''process that consumes values from router'''
     while True:
         packet = yield pipe.get()
+        # This is for the priority queues
+        if isinstance(packet, tuple):
+            packet = packet[1]
         run_data[TOTAL_PACKET_TIME] += (env.now - packet.start_time)
         # print "packet {} arrived at dest".format(packet.seq_num)
 
@@ -159,7 +159,7 @@ def normal():
 
 if __name__=="__main__":
 
-    for i in range(4, 6):
+    for i in range(8):
 
         SINGLE_QUEUE_VARIANT = (i % 2 == 0)
 
@@ -167,7 +167,17 @@ if __name__=="__main__":
             TRAFFIC_GENERATION_RATE = 1125
 
         if i > 3:
-            TRAFFIC_GENERATION_RATE = 2150
+            TRAFFIC_GENERATION_RATE = 750
+            X = 2
+            Y = 2
+
+        if i > 5:
+            TRAFFIC_GENERATION_RATE = 1125
+
+        # Header for dataset
+        param = "file_name={}, Seeds={}, TRAFFIC_GENERATION_RATE={}, SINGLE_QUEUE_VARIANT={}, X={}, Y={}".format(
+            file_names[i], SEEDS, TRAFFIC_GENERATION_RATE, SINGLE_QUEUE_VARIANT, X, Y)
+        total_data.append(param)
 
         for s in SEEDS:
 
@@ -194,6 +204,10 @@ if __name__=="__main__":
 
             # reset run_data for next seed
             run_data = [0 for _ in range(4)]
+
+            HIGH_PRIORITY_QUEUE = PriorityQueue(10000)  # 10 MB / 1000 Byte packets
+            LOW_PRIORITY_QUEUE = PriorityQueue(10000)  # 10 MB / 1000 Byte packets
+            FIFO_QUEUE = Queue(10000)  # 10MB / 1000 Byte packets
 
         print total_data
 
