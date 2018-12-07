@@ -2,6 +2,7 @@
 import random
 from Queue import Queue
 import itertools
+import json
 
 import simpy
 
@@ -10,8 +11,8 @@ SINGLE_QUEUE_VARIANT = False  # change to true to use a single queue
 FIFO_QUEUE = Queue(10000)  # 10MB / 1000 Byte packets
 
 # values may need to change for unit conversions
-SEEDS = [seed for seed in range(13, 43)]  # change as desired (multiple runs)
-TRAFFIC_GENERATION_RATE = 20  # number of packets per second from source node
+SEEDS = [seed for seed in range(13, 64)]  # change as desired (multiple runs) - currently set for 50 runs
+TRAFFIC_GENERATION_RATE = 750  # number of packets per second from source node. Test both 750 and 1125; 60% and 90% server utilization
 TRANSMITION_SPEED_SOURCE = 10  # in Mbps
 TRANSMITION_SPEED_ROUTER = 15  # in Mbps
 PACKET_DATA_LENGTH = 1000  # in Bytes (1 Byte = 8 bits)
@@ -32,6 +33,13 @@ TOTAL_PACKETS_DROPPED = 3
 
 run_data = [0 for _ in range(4)]  # holds data for each run
 total_data = []  # data summary
+
+file_names = ['single_queue_750.json',
+              'two_queue_750.json',
+              'single_queue_1125.json',
+              'two_queue_1125.json',
+              'single_queue_2150.json',
+              'two_queue_2150.json']
 
 
 class Packet(object):
@@ -56,6 +64,10 @@ class Pipes(object):
             if FIFO_QUEUE.full():
                 run_data[TOTAL_PACKETS_DROPPED] += 1
             else:
+                if packet.seq_num < self.current_seq:
+                    run_data[TOTAL_OUT_ORDER_PACKETS] += 1
+                if packet.seq_num > self.current_seq:
+                    self.current_seq = packet.seq_num
                 FIFO_QUEUE.put(packet)
 
         else:
@@ -84,7 +96,7 @@ class Pipes(object):
 
     def fixed_latency(self, p):
         '''simulates the fixed latency from router to dest node'''
-        yield self.env.timeout((ROUTER_DEST_DELAY / 1000.0) + (1875**-1))  # change to 1250**-1
+        yield self.env.timeout((ROUTER_DEST_DELAY / 1000.0) + (1250**-1))  # change to 1250**-1
         self.to_dest.put(p)
 
     def put_dest(self, p):
@@ -147,31 +159,46 @@ def normal():
 
 if __name__=="__main__":
 
-    for s in SEEDS:
+    for i in range(4, 6):
 
-        random.seed(s)
+        SINGLE_QUEUE_VARIANT = (i % 2 == 0)
 
-        print 'creating env and pipes'
-        env = simpy.Environment()
-        pipe = Pipes(env)
+        if i > 1:
+            TRAFFIC_GENERATION_RATE = 1125
 
-        print 'init source node process'
-        env.process(source_node(env, pipe))
+        if i > 3:
+            TRAFFIC_GENERATION_RATE = 2150
 
-        print 'init router process'
-        env.process(router(env, pipe))
+        for s in SEEDS:
 
-        print 'init dest node process'
-        env.process(destination_node(env, pipe))
+            random.seed(s)
 
-        print 'start simulation'
-        env.run(until=SIM_DURATION)
+            print 'creating env and pipes'
+            env = simpy.Environment()
+            pipe = Pipes(env)
 
-        print run_data
-        total_data.append(run_data)
+            print 'init source node process'
+            env.process(source_node(env, pipe))
 
-        # reset run_data for next seed
-        run_data = [0 for _ in range(4)]
+            print 'init router process'
+            env.process(router(env, pipe))
 
-    print total_data
+            print 'init dest node process'
+            env.process(destination_node(env, pipe))
+
+            print 'start simulation'
+            env.run(until=SIM_DURATION)
+
+            print run_data
+            total_data.append(run_data)
+
+            # reset run_data for next seed
+            run_data = [0 for _ in range(4)]
+
+        print total_data
+
+        with open(file_names[i], 'w') as outfile:
+            json.dump(total_data, outfile)
+
+        total_data = []
 
