@@ -1,6 +1,6 @@
 #!/usr/bin/python
 import random
-from Queue import Queue, PriorityQueue
+from Queue import Queue
 import itertools
 import json
 
@@ -17,8 +17,8 @@ TRANSMITION_SPEED_SOURCE = 10  # in Mbps
 TRANSMITION_SPEED_ROUTER = 15  # in Mbps
 PACKET_DATA_LENGTH = 1000  # in Bytes (1 Byte = 8 bits)
 ROUTER_DEST_DELAY = 50  # in ms
-HIGH_PRIORITY_QUEUE = PriorityQueue(10000)  # 10 MB / 1000 Byte packets
-LOW_PRIORITY_QUEUE = PriorityQueue(10000)  # 10 MB / 1000 Byte packets
+HIGH_PRIORITY_QUEUE = Queue(10000)  # 10 MB / 1000 Byte packets
+LOW_PRIORITY_QUEUE = Queue(10000)  # 10 MB / 1000 Byte packets
 SIM_DURATION = 100  # length of simulation in ticks
 
 # for normal distribution
@@ -49,6 +49,7 @@ class Pipes(object):
         self.env = env
         self.to_dest = simpy.Store(env)
         self.current_seq = -1
+        self.router_has_value = simpy.Store(env)
 
     def router_send(self, packet):
         '''sorts the packets into high/low priority queues
@@ -62,27 +63,29 @@ class Pipes(object):
                 if packet.seq_num > self.current_seq:
                     self.current_seq = packet.seq_num
                 FIFO_QUEUE.put(packet)
+                self.router_put(1)
 
         else:
             if packet.seq_num < self.current_seq:
-                #run_data[TOTAL_OUT_ORDER_PACKETS] += 1
                 if HIGH_PRIORITY_QUEUE.full():
                     run_data[TOTAL_PACKETS_DROPPED] += 1
                 else:
                     #print packet.seq_num
-                    HIGH_PRIORITY_QUEUE.put((packet.seq_num, packet))
+                    HIGH_PRIORITY_QUEUE.put(packet)
+                    self.router_put(1)
 
             else:
                 if LOW_PRIORITY_QUEUE.full():
                     run_data[TOTAL_PACKETS_DROPPED] += 1
                 else:
                     #print packet.seq_num
-                    LOW_PRIORITY_QUEUE.put((packet.seq_num, packet))
+                    LOW_PRIORITY_QUEUE.put(packet)
+                    self.router_put(1)
                     self.current_seq = packet.seq_num
 
     def router_latency(self, p):
         '''simulates the random normal dist latency unique to each packet'''
-        yield self.env.timeout((p.delay / 1000.0) + (1250**-1))
+        yield self.env.timeout((p.delay / 1000.0))  # + (1250**-1))
         self.router_send(p)
 
     def put_router(self, p):
@@ -91,7 +94,7 @@ class Pipes(object):
 
     def fixed_latency(self, p):
         '''simulates the fixed latency from router to dest node'''
-        yield self.env.timeout((ROUTER_DEST_DELAY / 1000.0) + (1250**-1))  # change to 1250**-1
+        yield self.env.timeout((ROUTER_DEST_DELAY / 1000.0))  # + (1250**-1))  # change to 1250**-1
         self.to_dest.put(p)
 
     def put_dest(self, p):
@@ -102,6 +105,12 @@ class Pipes(object):
         '''used by the destination node to receive packets'''
         return self.to_dest.get()
 
+    def router_put(self, v):
+        self.router_has_value.put(v)
+
+    def router_get(self):
+        return self.router_has_value.get()
+
 
 def source_node(env, pipe):
     '''generates packets
@@ -110,8 +119,9 @@ def source_node(env, pipe):
     for i in itertools.count():
         yield env.timeout(1.0 / TRAFFIC_GENERATION_RATE)  # poisson process
         p = Packet(env, i)
-        run_data[TOTAL_NUM_PACKETS] += 1
         pipe.put_router(p)
+        yield env.timeout(1250**-1)  # transmission speed
+
 
 def router(env, pipe):
     '''checks both queues and sends packets from queues to dest node
@@ -119,28 +129,32 @@ def router(env, pipe):
     print statements are for testing'''
 
     while True:
+        yield pipe.router_get()
+
         if SINGLE_QUEUE_VARIANT:
             if not FIFO_QUEUE.empty():
                 packet = FIFO_QUEUE.get()
                 pipe.put_dest(packet)
+                yield env.timeout(1250**-1)  # transmission speed
 
         else:
             if not HIGH_PRIORITY_QUEUE.empty():
                 packet = HIGH_PRIORITY_QUEUE.get()
                 pipe.put_dest(packet)
+                yield env.timeout(1250**-1)  # transmission speed
             if HIGH_PRIORITY_QUEUE.empty() and not LOW_PRIORITY_QUEUE.empty():
                 packet = LOW_PRIORITY_QUEUE.get()
                 pipe.put_dest(packet)
-        yield env.timeout(0.0001)
+                yield env.timeout(1250**-1)  # transmission speed
+        #yield env.timeout(0.0001)
 
 def destination_node(env, pipe):
     '''process that consumes values from router'''
     current_seq = -1
     while True:
         packet = yield pipe.get()
-        # This is for the priority queues
-        if isinstance(packet, tuple):
-            packet = packet[1]
+        
+        run_data[TOTAL_NUM_PACKETS] += 1
 
         if packet.seq_num < current_seq:
             run_data[TOTAL_OUT_ORDER_PACKETS] += 1
@@ -159,7 +173,7 @@ def normal():
 
 if __name__=="__main__":
 
-    for i in range(4, 8):
+    for i in range(12):
 
         SINGLE_QUEUE_VARIANT = (i % 2 == 0)
 
@@ -172,6 +186,14 @@ if __name__=="__main__":
             Y = 45
 
         if i > 5:
+            TRAFFIC_GENERATION_RATE = 1125
+
+        if i > 7:
+            TRAFFIC_GENERATION_RATE = 750
+            X = 50
+            Y = 1
+
+        if i > 9:
             TRAFFIC_GENERATION_RATE = 1125
 
         file_name = "Queue{}_{}_mean{}_var{}.json".format(i%2+1, TRAFFIC_GENERATION_RATE, X, Y)
@@ -202,14 +224,18 @@ if __name__=="__main__":
             print 'start simulation'
             env.run(until=SIM_DURATION)
 
+            run_data[TOTAL_PACKET_TIME] = float(run_data[TOTAL_PACKET_TIME]) / run_data[TOTAL_NUM_PACKETS]
+            run_data[TOTAL_OUT_ORDER_PACKETS] = float(run_data[TOTAL_OUT_ORDER_PACKETS]) / run_data[TOTAL_NUM_PACKETS]
+            run_data[TOTAL_PACKETS_DROPPED] = float(run_data[TOTAL_PACKETS_DROPPED]) / run_data[TOTAL_NUM_PACKETS]
+
             print run_data
             total_data.append(run_data)
 
             # reset run_data for next seed
             run_data = [0 for _ in range(4)]
 
-            HIGH_PRIORITY_QUEUE = PriorityQueue(10000)  # 10 MB / 1000 Byte packets
-            LOW_PRIORITY_QUEUE = PriorityQueue(10000)  # 10 MB / 1000 Byte packets
+            HIGH_PRIORITY_QUEUE = Queue(10000)  # 10 MB / 1000 Byte packets
+            LOW_PRIORITY_QUEUE = Queue(10000)  # 10 MB / 1000 Byte packets
             FIFO_QUEUE = Queue(10000)  # 10MB / 1000 Byte packets
 
         print total_data
