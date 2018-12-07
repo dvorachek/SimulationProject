@@ -22,8 +22,8 @@ LOW_PRIORITY_QUEUE = PriorityQueue(10000)  # 10 MB / 1000 Byte packets
 SIM_DURATION = 100  # length of simulation in ticks
 
 # for normal distribution
-X = 1  # change as needed
-Y = 1  # change as needed
+X = 30  # init value
+Y = 25  # init value
 
 # const index for data collection
 TOTAL_NUM_PACKETS = 0
@@ -33,15 +33,6 @@ TOTAL_PACKETS_DROPPED = 3
 
 run_data = [0 for _ in range(4)]  # holds data for each run
 total_data = []  # data summary
-
-file_names = ['single_queue_750_X1_Y1.json',
-              'two_queue_750_X1_Y1.json',
-              'single_queue_1125_X1_Y1.json',
-              'two_queue_1125_X1_Y1.json',
-              'single_queue_750_X2_Y2.json',
-              'two_queue_750_X2_Y2.json',
-              'single_queue_1125_X2_Y2.json',
-              'two_queue_1125_X2_Y2.json']
 
 
 class Packet(object):
@@ -66,30 +57,32 @@ class Pipes(object):
             if FIFO_QUEUE.full():
                 run_data[TOTAL_PACKETS_DROPPED] += 1
             else:
-                if packet.seq_num < self.current_seq:
-                    run_data[TOTAL_OUT_ORDER_PACKETS] += 1
+                #if packet.seq_num < self.current_seq:
+                #    run_data[TOTAL_OUT_ORDER_PACKETS] += 1
                 if packet.seq_num > self.current_seq:
                     self.current_seq = packet.seq_num
                 FIFO_QUEUE.put(packet)
 
         else:
             if packet.seq_num < self.current_seq:
-                run_data[TOTAL_OUT_ORDER_PACKETS] += 1
+                #run_data[TOTAL_OUT_ORDER_PACKETS] += 1
                 if HIGH_PRIORITY_QUEUE.full():
                     run_data[TOTAL_PACKETS_DROPPED] += 1
                 else:
+                    #print packet.seq_num
                     HIGH_PRIORITY_QUEUE.put((packet.seq_num, packet))
 
             else:
                 if LOW_PRIORITY_QUEUE.full():
                     run_data[TOTAL_PACKETS_DROPPED] += 1
                 else:
+                    #print packet.seq_num
                     LOW_PRIORITY_QUEUE.put((packet.seq_num, packet))
                     self.current_seq = packet.seq_num
 
     def router_latency(self, p):
         '''simulates the random normal dist latency unique to each packet'''
-        yield self.env.timeout(p.delay + (1250**-1))
+        yield self.env.timeout((p.delay / 1000.0) + (1250**-1))
         self.router_send(p)
 
     def put_router(self, p):
@@ -142,11 +135,18 @@ def router(env, pipe):
 
 def destination_node(env, pipe):
     '''process that consumes values from router'''
+    current_seq = -1
     while True:
         packet = yield pipe.get()
         # This is for the priority queues
         if isinstance(packet, tuple):
             packet = packet[1]
+
+        if packet.seq_num < current_seq:
+            run_data[TOTAL_OUT_ORDER_PACKETS] += 1
+        else:
+            current_seq = packet.seq_num
+        
         run_data[TOTAL_PACKET_TIME] += (env.now - packet.start_time)
         # print "packet {} arrived at dest".format(packet.seq_num)
 
@@ -159,7 +159,7 @@ def normal():
 
 if __name__=="__main__":
 
-    for i in range(8):
+    for i in range(4, 8):
 
         SINGLE_QUEUE_VARIANT = (i % 2 == 0)
 
@@ -168,16 +168,19 @@ if __name__=="__main__":
 
         if i > 3:
             TRAFFIC_GENERATION_RATE = 750
-            X = 2
-            Y = 2
+            X = 50
+            Y = 45
 
         if i > 5:
             TRAFFIC_GENERATION_RATE = 1125
 
+        file_name = "Queue{}_{}_mean{}_var{}.json".format(i%2+1, TRAFFIC_GENERATION_RATE, X, Y)
+
         # Header for dataset
         param = "file_name={}, Seeds={}, TRAFFIC_GENERATION_RATE={}, SINGLE_QUEUE_VARIANT={}, X={}, Y={}".format(
-            file_names[i], SEEDS, TRAFFIC_GENERATION_RATE, SINGLE_QUEUE_VARIANT, X, Y)
+            file_name, SEEDS, TRAFFIC_GENERATION_RATE, SINGLE_QUEUE_VARIANT, X, Y)
         total_data.append(param)
+
 
         for s in SEEDS:
 
@@ -211,7 +214,7 @@ if __name__=="__main__":
 
         print total_data
 
-        with open(file_names[i], 'w') as outfile:
+        with open(file_name, 'w') as outfile:
             json.dump(total_data, outfile)
 
         total_data = []
