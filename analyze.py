@@ -1,28 +1,17 @@
 import json
 import os
 
-'''import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
+import math
 import numpy as np
 import scipy.stats as st
 
 
-def mean_confidence_interval(data, confidence=0.95):
-    a = 1.0 * np.array(data)
-    n = len(a)
-    m, se = np.mean(a), scipy.stats.sem(a)
-    h = se * scipy.stats.t.ppf((1 + confidence) / 2., n-1)
-    return m, m-h, m+h
+def confidence_interval(mean, n, std, confidence=.95, z=1.96):
+    return (mean + (z * (std / math.sqrt(n))), mean - (z * (std / math.sqrt(n))))
 
-    get mean 
-    get std
-     specifically unbiased
-    n = num elements
-    divide by sqr n
-
-    mult by z = 1.96
-
-    mean value += above value are the intervals
-'''
+def std(data, mean):
+    return math.sqrt(sum([(item - mean)**2 for item in data])/len(data))
 
 
 if __name__=="__main__":
@@ -31,38 +20,35 @@ if __name__=="__main__":
 
     for file in data_files:
 
-
         with open(file) as f:
             data = json.load(f)
 
         print '='*60
         print("file:{}".format(file))
         #print("header:{}".format(data[0]))
-        
-        avg_num_packets = float(sum([num_packets[0] for num_packets in data[1:]])) / len(data)
-        sum_packet_time = float(sum([num_packets[1] for num_packets in data[1:]])) / len(data)
-        sum_out_order = float(sum([num_packets[2] for num_packets in data[1:]])) / len(data)
-        sum_dropped = float(sum([num_packets[3] for num_packets in data[1:]])) / len(data)
 
+        num_packet = [item[0] for item in data[1:]]
+        packet_time = [item[1] for item in data[1:]]
+        out_order = [item[2] for item in data[1:]]
+        dropped = [item[2] for item in data[1:]]
         
-        #print("avg_num_packets={}".format(avg_num_packets))
-        print("sum_packet_time={}".format(sum_packet_time))
-        #print("sum_out_order={}".format(sum_out_order))
-        #print("sum_dropped={}".format(sum_dropped))
-        #for item in data[1:]:
-            #print item[0]
-            #avg_num_packets = sum([num_packets[0] for num_packets in item[0]) / len(data)
-            
-            #print avg_num_packets
-            #avg_num_packets += item[0]
-            #sum_packet_time += item[1]
-            #sum_out_order += item[2]
-            #sum_dropped += item[3]
+        mean_num_packets = float(sum(num_packet)) / len(data[1:])
+        mean_packet_time = float(sum(packet_time)) / len(data[1:])
+        mean_out_order = float(sum(out_order)) / len(data[1:])
+        mean_dropped = float(sum(dropped)) / len(data[1:])
+
+        std_num_packets = std(num_packet, mean_num_packets)
+        std_packet_time = std(packet_time, mean_packet_time)
+        std_out_order = std(out_order, mean_out_order)
+        std_dropped = std(dropped, mean_dropped)
+
+        ci_num_packets = confidence_interval(mean_num_packets, len(data[1:]), std_num_packets)
+        ci_packet_time = confidence_interval(mean_packet_time, len(data[1:]), std_packet_time)
+        ci_out_order = confidence_interval(mean_out_order, len(data[1:]), std_out_order)
+        ci_dropped = confidence_interval(mean_dropped, len(data[1:]), std_dropped)
         
-        
+        print("mean_num_packets={}, std_num_packets={}, ci_num_packets={}".format(mean_num_packets, std_num_packets, ci_num_packets))
+        print("mean_packet_time={}, std_packet_time={}, ci_packet_time={}".format(mean_packet_time, std_packet_time, ci_packet_time))
+        print("mean_out_order={}, std_out_order={}, ci_out_order={}".format(mean_out_order, std_out_order, ci_out_order))
+        print("mean_dropped={}, std_dropped={}, ci_dropped={}".format(mean_dropped, std_dropped, ci_dropped))
 
-
-
-
-        
-    
