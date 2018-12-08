@@ -12,6 +12,16 @@ def mean_confidence_interval(data, confidence=0.95):
     m, se = np.mean(a), scipy.stats.sem(a)
     h = se * scipy.stats.t.ppf((1 + confidence) / 2., n-1)
     return m, m-h, m+h
+
+    get mean 
+    get std
+     specifically unbiased
+    n = num elements
+    divide by sqr n
+
+    mult by z = 1.96
+
+    mean value += above value are the intervals
 '''
 
 
@@ -27,7 +37,7 @@ if __name__=="__main__":
 
         print '='*60
         print("file:{}".format(file))
-        print("header:{}".format(data[0]))
+        #print("header:{}".format(data[0]))
         
         avg_num_packets = float(sum([num_packets[0] for num_packets in data[1:]])) / len(data)
         sum_packet_time = float(sum([num_packets[1] for num_packets in data[1:]])) / len(data)
@@ -35,10 +45,10 @@ if __name__=="__main__":
         sum_dropped = float(sum([num_packets[3] for num_packets in data[1:]])) / len(data)
 
         
-        print avg_num_packets
-        print sum_packet_time
-        print sum_out_order
-        print sum_dropped
+        #print("avg_num_packets={}".format(avg_num_packets))
+        print("sum_packet_time={}".format(sum_packet_time))
+        #print("sum_out_order={}".format(sum_out_order))
+        #print("sum_dropped={}".format(sum_dropped))
         #for item in data[1:]:
             #print item[0]
             #avg_num_packets = sum([num_packets[0] for num_packets in item[0]) / len(data)
