@@ -82,7 +82,7 @@ class Pipes(object):
                     #print packet.seq_num
                     LOW_PRIORITY_QUEUE.put(packet)
                     self.router_put(1)
-                    current_seq = packet.seq_num
+                    self.current_seq = packet.seq_num
 
     def router_latency(self, p):
         '''simulates the random normal dist latency unique to each packet'''
