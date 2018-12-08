@@ -70,7 +70,6 @@ class Pipes(object):
                 if HIGH_PRIORITY_QUEUE.full():
                     run_data[TOTAL_PACKETS_DROPPED] += 1
                 else:
-                    #print packet.seq_num
                     HIGH_PRIORITY_QUEUE.put(packet)
                     self.router_put(1)
 
@@ -78,10 +77,10 @@ class Pipes(object):
                 if LOW_PRIORITY_QUEUE.full():
                     run_data[TOTAL_PACKETS_DROPPED] += 1
                 else:
-                    #print packet.seq_num
                     LOW_PRIORITY_QUEUE.put(packet)
-                    self.router_put(1)
                     self.current_seq = packet.seq_num
+                    self.router_put(1)
+                    
 
     def router_latency(self, p):
         '''simulates the random normal dist latency unique to each packet'''
@@ -115,9 +114,7 @@ class Pipes(object):
 
 
 def source_node(env, pipe):
-    '''generates packets
-
-    need to add poisson rate of arrival'''
+    '''generates packets'''
     for i in itertools.count():
         yield env.timeout(1.0 / TRAFFIC_GENERATION_RATE)  # poisson process
         p = Packet(env, i)
@@ -125,26 +122,25 @@ def source_node(env, pipe):
         pipe.put_router(p)   
 
 def router(env, pipe):
-    '''checks both queues and sends packets from queues to dest node
-    
-    print statements are for testing'''
-
+    '''checks both queues and sends packets from queues to dest node'''
     while True:
         yield pipe.router_trigger()
-        yield env.timeout(1250**-1)  # transmission speed
 
         if SINGLE_QUEUE_VARIANT:
             if not FIFO_QUEUE.empty():
                 packet = FIFO_QUEUE.get()
+                yield env.timeout(1250**-1)  # transmission speed
                 pipe.put_dest(packet)
 
         else:
             if not HIGH_PRIORITY_QUEUE.empty():
                 packet = HIGH_PRIORITY_QUEUE.get()
+                yield env.timeout(1250**-1)  # transmission speed
                 pipe.put_dest(packet)
 
-            if not LOW_PRIORITY_QUEUE.empty():
+            if HIGH_PRIORITY_QUEUE.empty() and not LOW_PRIORITY_QUEUE.empty():
                 packet = LOW_PRIORITY_QUEUE.get()
+                yield env.timeout(1250**-1)  # transmission speed
                 pipe.put_dest(packet)
 
 def destination_node(env, pipe):
