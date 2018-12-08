@@ -1,14 +1,8 @@
 import json
 import os
-
 import matplotlib.pyplot as plt
 import math
-import numpy as np
-import scipy.stats as st
 
-
-def confidence_interval(mean, n, std, confidence=.95, z=1.96):
-    return (mean + (z * (std / math.sqrt(n))), mean - (z * (std / math.sqrt(n))))
 
 def ci(data, confidence=.95, z=1.96):
     n = len(data)
@@ -21,29 +15,20 @@ def std(data, mean):
 
 
 if __name__=="__main__":
-    os.chdir('data')
-    data_files = os.listdir(os.getcwd())
-
     match_data = dict()
-
     green_diamond = dict(markerfacecolor='g', marker='D')
     red_square = dict(markerfacecolor='r', marker='s')
 
-    for file in data_files:
+    os.chdir('data')
 
+    for file in os.listdir(os.getcwd()):
         with open(file) as f:
             data = json.load(f)
 
-        print '='*60
-        print("file:{}".format(file))
-
-        #print("header:{}".format(data[0]))
-        #print data
+        print("file read: {}".format(file))
 
         key = file[6:]
         index = int(file[5:6]) - 1
-        print key
-        print index
 
         if key not in match_data:
             match_data[key] = [0 for _ in range(2)]
@@ -55,8 +40,7 @@ if __name__=="__main__":
 
         all_data = [num_packet, packet_time, out_order, dropped]
       
-        match_data[key][index] = all_data #, means, stds, confidence_intervals]
-
+        match_data[key][index] = all_data
 
     for k, v in match_data.iteritems():
         single_q = v[0]
@@ -64,28 +48,30 @@ if __name__=="__main__":
 
         combined_packet_time = [single_q[1]] + [two_q[1]]
         print combined_packet_time
-
-        fig1, ax1 = plt.subplots()
-        ax1.set_title("comparing packet times {}".format(key))
-        ax1.boxplot(combined_packet_time, conf_intervals=[ci(combined_packet_time[0]), ci(combined_packet_time[1])])
-        plt.show()
-
-
         combined_out_order = [single_q[2]] + [two_q[2]]
         print combined_packet_time
-
-        fig2, ax2 = plt.subplots()
-        ax2.set_title("comparing out of order rates {}".format(key))
-        ax2.boxplot(combined_out_order, conf_intervals=[ci(combined_out_order[0]), ci(combined_out_order[1])], flierprops=green_diamond)
-        plt.show()
-
-
         combined_dropped = [single_q[3]] + [two_q[3]]
         print combined_dropped
 
-        fig3, ax3 = plt.subplots()
-        ax3.set_title("comparing packet drop rates {}".format(key))
-        ax3.boxplot(combined_dropped, conf_intervals=[ci(combined_dropped[0]), ci(combined_dropped[1])], flierprops=red_square)
-        plt.show()
+        combined = [combined_packet_time, combined_out_order, combined_dropped]
+        header = ['Packet Time in System', 'Out-of-order Rate', 'Rate of Packets Dropped']
 
+        rate, mean, var = k.split('_')[1:]
+        mean = mean[4:]
+        var = var[3:].split('.')[0]
         
+        for i in range(3):
+            fig, ax = plt.subplots()
+
+            ax.set_title("{}\nGeneration Rate = {} Mean = {} Var = {}".format(header[i],
+                                                                                     rate,
+                                                                                     mean,
+                                                                                     var))
+            ax.boxplot(combined[i],
+                       conf_intervals=[ci(combined[i][0]),
+                       ci(combined[i][1])],
+                       flierprops=green_diamond)
+            plt.xticks([1, 2], ['Single Queue', 'Two Priority Queues'])
+
+            fig.savefig('../graphs/{}_generationRate{}.png'.format(header[i].replace(' ', '_'), k[1:]))
+
