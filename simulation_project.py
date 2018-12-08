@@ -1,4 +1,5 @@
 #!/usr/bin/python
+import os
 import random
 from Queue import Queue
 import itertools
@@ -22,8 +23,8 @@ LOW_PRIORITY_QUEUE = Queue(10000)  # 10 MB / 1000 Byte packets
 SIM_DURATION = 100  # length of simulation in ticks
 
 # for normal distribution
-X = 30  # init value
-Y = 25  # init value
+X = 250  # init value
+Y = 2  # init value
 
 # const index for data collection
 TOTAL_NUM_PACKETS = 0
@@ -58,8 +59,8 @@ class Pipes(object):
             if FIFO_QUEUE.full():
                 run_data[TOTAL_PACKETS_DROPPED] += 1
             else:
-                #if packet.seq_num < self.current_seq:
-                #    run_data[TOTAL_OUT_ORDER_PACKETS] += 1
+                if packet.seq_num < self.current_seq:
+                    run_data[TOTAL_OUT_ORDER_PACKETS] += 1
                 if packet.seq_num > self.current_seq:
                     self.current_seq = packet.seq_num
                 FIFO_QUEUE.put(packet)
@@ -81,7 +82,7 @@ class Pipes(object):
                     #print packet.seq_num
                     LOW_PRIORITY_QUEUE.put(packet)
                     self.router_put(1)
-                    self.current_seq = packet.seq_num
+                    current_seq = packet.seq_num
 
     def router_latency(self, p):
         '''simulates the random normal dist latency unique to each packet'''
@@ -108,7 +109,7 @@ class Pipes(object):
     def router_put(self, v):
         self.router_has_value.put(v)
 
-    def router_get(self):
+    def router_trigger(self):
         return self.router_has_value.get()
 
 
@@ -119,9 +120,9 @@ def source_node(env, pipe):
     for i in itertools.count():
         yield env.timeout(1.0 / TRAFFIC_GENERATION_RATE)  # poisson process
         p = Packet(env, i)
-        pipe.put_router(p)
         yield env.timeout(1250**-1)  # transmission speed
-
+        pipe.put_router(p)
+        
 
 def router(env, pipe):
     '''checks both queues and sends packets from queues to dest node
@@ -129,24 +130,26 @@ def router(env, pipe):
     print statements are for testing'''
 
     while True:
-        yield pipe.router_get()
+        yield pipe.router_trigger()
 
         if SINGLE_QUEUE_VARIANT:
             if not FIFO_QUEUE.empty():
                 packet = FIFO_QUEUE.get()
-                pipe.put_dest(packet)
                 yield env.timeout(1250**-1)  # transmission speed
+                pipe.put_dest(packet)
 
         else:
             if not HIGH_PRIORITY_QUEUE.empty():
                 packet = HIGH_PRIORITY_QUEUE.get()
-                pipe.put_dest(packet)
                 yield env.timeout(1250**-1)  # transmission speed
-            if HIGH_PRIORITY_QUEUE.empty() and not LOW_PRIORITY_QUEUE.empty():
+                pipe.put_dest(packet)
+
+            if not LOW_PRIORITY_QUEUE.empty():
                 packet = LOW_PRIORITY_QUEUE.get()
-                pipe.put_dest(packet)
                 yield env.timeout(1250**-1)  # transmission speed
-        #yield env.timeout(0.0001)
+                pipe.put_dest(packet)
+                
+        #yield env.timeout(1250**-1)  # transmission speed
 
 def destination_node(env, pipe):
     '''process that consumes values from router'''
@@ -162,7 +165,6 @@ def destination_node(env, pipe):
             current_seq = packet.seq_num
         
         run_data[TOTAL_PACKET_TIME] += (env.now - packet.start_time)
-        # print "packet {} arrived at dest".format(packet.seq_num)
 
 def normal():
     delay = -1
@@ -172,6 +174,7 @@ def normal():
 
 
 if __name__=="__main__":
+    os.chdir('data')
 
     for i in range(12):
 
@@ -197,31 +200,32 @@ if __name__=="__main__":
             TRAFFIC_GENERATION_RATE = 1125
 
         file_name = "Queue{}_{}_mean{}_var{}.json".format(i%2+1, TRAFFIC_GENERATION_RATE, X, Y)
+        print(file_name)
+        print('avg_num_packets, avg_packet_time, avg_out_order, avg_dropped')
 
         # Header for dataset
         param = "file_name={}, Seeds={}, TRAFFIC_GENERATION_RATE={}, SINGLE_QUEUE_VARIANT={}, X={}, Y={}".format(
             file_name, SEEDS, TRAFFIC_GENERATION_RATE, SINGLE_QUEUE_VARIANT, X, Y)
         total_data.append(param)
 
-
         for s in SEEDS:
 
             random.seed(s)
 
-            print 'creating env and pipes'
+            #print 'creating env and pipes'
             env = simpy.Environment()
             pipe = Pipes(env)
 
-            print 'init source node process'
+            #print 'init source node process'
             env.process(source_node(env, pipe))
 
-            print 'init router process'
+            #print 'init router process'
             env.process(router(env, pipe))
 
-            print 'init dest node process'
+            #print 'init dest node process'
             env.process(destination_node(env, pipe))
 
-            print 'start simulation'
+            #print 'start simulation'
             env.run(until=SIM_DURATION)
 
             run_data[TOTAL_PACKET_TIME] = float(run_data[TOTAL_PACKET_TIME]) / run_data[TOTAL_NUM_PACKETS]
@@ -238,7 +242,18 @@ if __name__=="__main__":
             LOW_PRIORITY_QUEUE = Queue(10000)  # 10 MB / 1000 Byte packets
             FIFO_QUEUE = Queue(10000)  # 10MB / 1000 Byte packets
 
-        print total_data
+        #print total_data
+
+        avg_num_packets = float(sum([num_packets[0] for num_packets in total_data[1:]])) / len(total_data[1:])
+        avg_packet_time = float(sum([num_packets[1] for num_packets in total_data[1:]])) / len(total_data[1:])
+        avg_out_order = float(sum([num_packets[2] for num_packets in total_data[1:]])) / len(total_data[1:])
+        avg_dropped = float(sum([num_packets[3] for num_packets in total_data[1:]])) / len(total_data[1:])
+
+        avgs = [avg_num_packets, avg_packet_time, avg_out_order, avg_dropped]
+
+        print(avgs)
+        print()
+
 
         with open(file_name, 'w') as outfile:
             json.dump(total_data, outfile)
