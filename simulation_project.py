@@ -59,8 +59,6 @@ class Pipes(object):
             if FIFO_QUEUE.full():
                 run_data[TOTAL_PACKETS_DROPPED] += 1
             else:
-                if packet.seq_num < self.current_seq:
-                    run_data[TOTAL_OUT_ORDER_PACKETS] += 1
                 if packet.seq_num > self.current_seq:
                     self.current_seq = packet.seq_num
                 FIFO_QUEUE.put(packet)
