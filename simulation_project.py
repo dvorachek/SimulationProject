@@ -84,7 +84,7 @@ class Pipes(object):
 
     def router_latency(self, p):
         '''simulates the random normal dist latency unique to each packet'''
-        yield self.env.timeout((p.delay) / 1000.0)
+        yield self.env.timeout((p.delay) / 1000.0)  # Normal distribution delay
         self.router_send(p)
 
     def put_router(self, p):
@@ -93,7 +93,7 @@ class Pipes(object):
 
     def fixed_latency(self, p):
         '''simulates the fixed latency from router to dest node'''
-        yield self.env.timeout((ROUTER_DEST_DELAY / 1000.0))
+        yield self.env.timeout((ROUTER_DEST_DELAY / 1000.0))  # Fixed delay
         self.to_dest.put(p)
 
     def put_dest(self, p):
