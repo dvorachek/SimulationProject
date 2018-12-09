@@ -116,7 +116,7 @@ class Pipes(object):
 def source_node(env, pipe):
     '''generates packets'''
     for i in itertools.count():
-        yield env.timeout(1.0 / TRAFFIC_GENERATION_RATE)  # poisson process
+        yield env.timeout(exponential() / 1000)  # poisson process
         p = Packet(env, i)
         yield env.timeout(1250**-1)  # transmission speed
         pipe.put_router(p)   
@@ -157,6 +157,12 @@ def destination_node(env, pipe):
             current_seq = packet.seq_num
         
         run_data[TOTAL_PACKET_TIME] += (env.now - packet.start_time)
+
+def exponential():
+    delay = -1
+    while delay < 0:
+        delay = random.expovariate(TRAFFIC_GENERATION_RATE)
+    return delay
 
 def normal():
     '''generates normal in ms'''
@@ -216,10 +222,13 @@ if __name__=="__main__":
             #print 'start simulation'
             env.run(until=SIM_DURATION)
 
+            #print run_data
+
             # get means
             run_data[TOTAL_PACKET_TIME] = float(run_data[TOTAL_PACKET_TIME]) / run_data[TOTAL_NUM_PACKETS]
             run_data[TOTAL_OUT_ORDER_PACKETS] = float(run_data[TOTAL_OUT_ORDER_PACKETS]) / run_data[TOTAL_NUM_PACKETS]
             run_data[TOTAL_PACKETS_DROPPED] = float(run_data[TOTAL_PACKETS_DROPPED]) / run_data[TOTAL_NUM_PACKETS]
+
 
             print run_data
             total_data.append(run_data)
@@ -244,4 +253,5 @@ if __name__=="__main__":
             json.dump(total_data, outfile)
 
         total_data = []
+
 
