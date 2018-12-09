@@ -25,7 +25,7 @@ if __name__=="__main__":
         with open(file) as f:
             data = json.load(f)
 
-        print("file read: {}".format(file))
+        print("reading file: {}".format(file))
 
         key = file[6:]
         index = int(file[5:6]) - 1
@@ -39,7 +39,6 @@ if __name__=="__main__":
         dropped = [item[3] for item in data[1:]]
 
         all_data = [num_packet, packet_time, out_order, dropped]
-      
         match_data[key][index] = all_data
 
     for k, v in match_data.iteritems():
@@ -47,11 +46,8 @@ if __name__=="__main__":
         two_q = v[1]
 
         combined_packet_time = [single_q[1]] + [two_q[1]]
-        #print combined_packet_time
         combined_out_order = [single_q[2]] + [two_q[2]]
-        #print combined_packet_time
         combined_dropped = [single_q[3]] + [two_q[3]]
-        #print combined_dropped
 
         combined = [combined_packet_time, combined_out_order, combined_dropped]
         header = ['Packet Time in System', 'Out-of-order Rate', 'Rate of Packets Dropped']
@@ -62,55 +58,28 @@ if __name__=="__main__":
         
         for i in range(3):
 
+            # print raw data
             title =("\n{}: Generation Rate = {} Mean = {} Var = {}".format(header[i], rate, mean, var))
             print(title)
             d = combined[i][0]
             print('Single Queue System Stats')
-            print("data: {}".format(d))
+            print("5 run data: {}".format(d))
             print("mean: {}".format(float(sum(d))/len(d)))
             print("CI: {}".format(ci(d)))
 
             d = combined[i][1]
             print('Priority Queueing System Stats')
-            print("data: {}".format(d))
+            print("5 run data: {}".format(d))
             print("mean: {}".format(float(sum(d))/len(d)))
             print("CI: {}".format(ci(d)))
 
+            # save plot
             fig, ax = plt.subplots()
-
-            ax.set_title("{}\nGeneration Rate = {} Mean = {} Var = {}".format(header[i],
-                                                                                     rate,
-                                                                                     mean,
-                                                                                     var))
+            ax.set_title("{}\nGeneration Rate = {} Mean = {} Var = {}".format(header[i], rate, mean, var))
             ax.boxplot(combined[i],
                        conf_intervals=[ci(combined[i][0]),
                        ci(combined[i][1])],
                        flierprops=green_diamond)
             plt.xticks([1, 2], ['Single Queue', 'Two Priority Queues'])
-
             fig.savefig('../graphs/{}_generationRate{}.png'.format(header[i].replace(' ', '_'), k[1:]))
-
-            '''
-            fig, ax = plt.subplots()
-
-            title = "{}\nGeneration Rate = {} Mean = {} Var = {}".format(header[i], rate, mean, var)
-            print(title)
-            print("data: {}".format(combined[i])
-            #print("single queue CI: {}".format(ci(combined[i][0])))
-            #print("priority queues CI: {}".format(ci(combined[i][1])))
-
-            ax.set_title("{}\nGeneration Rate = {} Mean = {} Var = {}".format(header[i],
-                                                                                     rate,
-                                                                                     mean,
-                                                                                     var))
-
-            ax.boxplot(combined[i],
-                       conf_intervals=[ci(combined[i][0]),
-                       ci(combined[i][1])],
-                       flierprops=green_diamond)
-
-            plt.xticks([1, 2], ['Single Queue', 'Two Priority Queues'])
-
-            fig.savefig('../graphs/{}_generationRate{}.png'.format(header[i].replace(' ', '_'), k[1:]))
-            '''
 
