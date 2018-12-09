@@ -222,13 +222,10 @@ if __name__=="__main__":
             #print 'start simulation'
             env.run(until=SIM_DURATION)
 
-            #print run_data
-
             # get means
             run_data[TOTAL_PACKET_TIME] = float(run_data[TOTAL_PACKET_TIME]) / run_data[TOTAL_NUM_PACKETS]
             run_data[TOTAL_OUT_ORDER_PACKETS] = float(run_data[TOTAL_OUT_ORDER_PACKETS]) / run_data[TOTAL_NUM_PACKETS]
             run_data[TOTAL_PACKETS_DROPPED] = float(run_data[TOTAL_PACKETS_DROPPED]) / run_data[TOTAL_NUM_PACKETS]
-
 
             print run_data
             total_data.append(run_data)
@@ -247,11 +244,10 @@ if __name__=="__main__":
         avgs = [avg_num_packets, avg_packet_time, avg_out_order, avg_dropped]
 
         print(avgs)
-        print()
+        print('\n')
 
         with open(file_name, 'w') as outfile:
             json.dump(total_data, outfile)
 
         total_data = []
-
 
