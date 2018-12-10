@@ -1,10 +1,10 @@
-#Simulation: Priority Queueing to Alleviate Packet Reordering Problem
+# Simulation: Priority Queueing to Alleviate Packet Reordering Problem
 
-##Requirements
+## Requirements
 
 pip install simpy
 
-##Run
+## Run
 
 __simulation.py__ to run simulation
 
