@@ -1,7 +1,9 @@
+#!/usr/bin/env python
 import json
 import os
 import matplotlib.pyplot as plt
 import math
+from scipy import stats
 
 
 def ci(data, confidence=.95, z=1.96):
@@ -62,14 +64,14 @@ if __name__=="__main__":
             title =("\n{}: Generation Rate = {} Mean = {} Var = {}".format(header[i], rate, mean, var))
             print(title)
             d = combined[i][0]
-            print('Single Queue System Stats')
-            print("5 run data: {}".format(d))
+            print('\nSingle Queue System Stats')
+            #print("5 run data: {}".format(d))
             print("mean: {}".format(float(sum(d))/len(d)))
             print("CI: {}".format(ci(d)))
 
             d = combined[i][1]
-            print('Priority Queueing System Stats')
-            print("5 run data: {}".format(d))
+            print('\nPriority Queueing System Stats')
+            #print("5 run data: {}".format(d))
             print("mean: {}".format(float(sum(d))/len(d)))
             print("CI: {}".format(ci(d)))
 
