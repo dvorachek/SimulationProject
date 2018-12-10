@@ -1,4 +1,4 @@
-# Simulation: Priority Queueing to Alleviate Packet Reordering Problem
+# Simulation: Priority Queueing to Alleviate Packet Reordering
 
 ## Requirements
 
