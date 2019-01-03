@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import os
 import random
-from Queue import Queue
+from queue import Queue
 import itertools
 import json
 
@@ -227,7 +227,7 @@ if __name__=="__main__":
             run_data[TOTAL_OUT_ORDER_PACKETS] = float(run_data[TOTAL_OUT_ORDER_PACKETS]) / run_data[TOTAL_NUM_PACKETS]
             run_data[TOTAL_PACKETS_DROPPED] = float(run_data[TOTAL_PACKETS_DROPPED]) / run_data[TOTAL_NUM_PACKETS]
 
-            print run_data
+            print(run_data)
             total_data.append(run_data)
 
             # reset run_data for next seed
